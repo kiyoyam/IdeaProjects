@@ -24,6 +24,9 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <!-- 覆盖 Spring Boot 2.7.18 默认的 1.18.30，否则在 JDK 17+（含本机 JDK26）上注解处理会抛 TypeTag :: UNKNOWN -->
+        <!-- IDEA 内项目 SDK 固定为 ms-17（Microsoft OpenJDK 17.0.19），语言级别 JDK_1_8 -->
+        <lombok.version>1.18.48</lombok.version>
     </properties>
 
     <dependencies>

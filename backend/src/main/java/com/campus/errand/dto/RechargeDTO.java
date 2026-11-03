@@ -1,0 +1,18 @@
+package com.campus.errand.dto;
+
+import lombok.Data;
+
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.NotNull;
+import java.math.BigDecimal;
+
+/**
+ * 充值参数
+ */
+@Data
+public class RechargeDTO {
+
+    @NotNull(message = "充值金额不能为空")
+    @DecimalMin(value = "0.01", message = "充值金额必须大于0")
+    private BigDecimal amount;
+}

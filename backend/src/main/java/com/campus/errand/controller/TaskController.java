@@ -8,6 +8,7 @@ import com.campus.errand.dto.TaskQueryDTO;
 import com.campus.errand.security.UserContext;
 import com.campus.errand.service.TaskService;
 import com.campus.errand.vo.OrderVO;
+import com.campus.errand.vo.TaskOverviewVO;
 import com.campus.errand.vo.TaskVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -96,7 +97,14 @@ public class TaskController {
     @Operation(summary = "我接的订单")
     @GetMapping("/mine/accepted")
     public Result<PageResult<OrderVO>> myAccepted(@RequestParam(defaultValue = "1") Integer page,
-                                                  @RequestParam(defaultValue = "10") Integer size) {
-        return Result.ok(taskService.myAccepted(UserContext.userId(), page, size));
+                                                  @RequestParam(defaultValue = "10") Integer size,
+                                                  @RequestParam(required = false) String status) {
+        return Result.ok(taskService.myAccepted(UserContext.userId(), page, size, status));
+    }
+
+    @Operation(summary = "工作台统计（接单数/收入/评分/广场概览）")
+    @GetMapping("/overview")
+    public Result<TaskOverviewVO> overview() {
+        return Result.ok(taskService.overview(UserContext.userId()));
     }
 }

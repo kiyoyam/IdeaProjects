@@ -20,6 +20,7 @@ import com.campus.errand.service.SettlementService;
 import com.campus.errand.service.TaskService;
 import com.campus.errand.service.UserService;
 import com.campus.errand.vo.OrderVO;
+import com.campus.errand.vo.TaskOverviewVO;
 import com.campus.errand.vo.TaskVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -101,7 +103,15 @@ public class TaskServiceImpl implements TaskService {
         if (StringUtils.hasText(dto.getStatus())) {
             qw.eq(Task::getStatus, dto.getStatus());
         }
-        qw.orderByDesc(Task::getCreateTime);
+        // 排序：默认最新，支持按报酬、截止时间
+        String sort = dto.getSort();
+        if ("reward".equalsIgnoreCase(sort)) {
+            qw.orderByDesc(Task::getReward).orderByDesc(Task::getCreateTime);
+        } else if ("deadline".equalsIgnoreCase(sort)) {
+            qw.orderByAsc(Task::getDeadline).orderByDesc(Task::getCreateTime);
+        } else {
+            qw.orderByDesc(Task::getCreateTime);
+        }
         taskMapper.selectPage(page, qw);
         List<TaskVO> vos = page.getRecords().stream().map(t -> toVO(t, userId)).collect(Collectors.toList());
         return new PageResult<>(page.getTotal(), vos);
@@ -109,7 +119,17 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public TaskVO detail(Long taskId, Long userId) {
-        return toVO(getTaskRequired(taskId), userId);
+        Task task = getTaskRequired(taskId);
+        TaskVO vo = toVO(task, userId);
+        // 详情页需要展示「接单时间」，取该任务最近一条接单记录
+        ErrandOrder order = errandOrderMapper.selectOne(new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getTaskId, taskId)
+                .orderByDesc(ErrandOrder::getId)
+                .last("limit 1"));
+        if (order != null) {
+            vo.setAcceptTime(order.getCreateTime());
+        }
+        return vo;
     }
 
     @Override
@@ -227,11 +247,20 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public PageResult<OrderVO> myAccepted(Long userId, Integer page, Integer size) {
+    public PageResult<OrderVO> myAccepted(Long userId, Integer page, Integer size, String status) {
         Page<ErrandOrder> p = new Page<>(page == null ? 1 : page, size == null ? 10 : size);
-        errandOrderMapper.selectPage(p, new LambdaQueryWrapper<ErrandOrder>()
-                .eq(ErrandOrder::getRunnerId, userId)
-                .orderByDesc(ErrandOrder::getCreateTime));
+        LambdaQueryWrapper<ErrandOrder> qw = new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getRunnerId, userId);
+        if (StringUtils.hasText(status)) {
+            if ("ACTIVE".equalsIgnoreCase(status)) {
+                // 进行中 = 已接单 + 配送中
+                qw.in(ErrandOrder::getStatus, Constants.STATUS_ACCEPTED, Constants.STATUS_IN_PROGRESS);
+            } else {
+                qw.eq(ErrandOrder::getStatus, status);
+            }
+        }
+        qw.orderByDesc(ErrandOrder::getCreateTime);
+        errandOrderMapper.selectPage(p, qw);
         List<ErrandOrder> orders = p.getRecords();
         Set<Long> taskIds = orders.stream().map(ErrandOrder::getTaskId).collect(Collectors.toSet());
         Map<Long, Task> taskMap = taskIds.isEmpty() ? Collections.emptyMap()
@@ -253,6 +282,7 @@ public class TaskServiceImpl implements TaskService {
             Task t = taskMap.get(o.getTaskId());
             if (t != null) {
                 vo.setTitle(t.getTitle());
+                vo.setCategory(t.getCategory());
                 vo.setPickupAddress(t.getPickupAddress());
                 vo.setDeliveryAddress(t.getDeliveryAddress());
                 vo.setDeadline(t.getDeadline());
@@ -260,6 +290,54 @@ public class TaskServiceImpl implements TaskService {
             vos.add(vo);
         }
         return new PageResult<>(p.getTotal(), vos);
+    }
+
+    @Override
+    public TaskOverviewVO overview(Long userId) {
+        TaskOverviewVO vo = new TaskOverviewVO();
+        // 我作为跑腿员的接单情况
+        Long active = errandOrderMapper.selectCount(new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getRunnerId, userId)
+                .in(ErrandOrder::getStatus, Constants.STATUS_ACCEPTED, Constants.STATUS_IN_PROGRESS));
+        Long completed = errandOrderMapper.selectCount(new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getRunnerId, userId)
+                .eq(ErrandOrder::getStatus, Constants.STATUS_COMPLETED));
+        Long cancelled = errandOrderMapper.selectCount(new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getRunnerId, userId)
+                .eq(ErrandOrder::getStatus, Constants.STATUS_CANCELLED));
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        Long today = errandOrderMapper.selectCount(new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getRunnerId, userId)
+                .ge(ErrandOrder::getCreateTime, todayStart));
+        vo.setActiveCount(active);
+        vo.setCompletedCount(completed);
+        vo.setCancelledCount(cancelled);
+        vo.setTodayCount(today);
+        // 累计收入 = 已完成订单报酬之和
+        List<ErrandOrder> completedOrders = errandOrderMapper.selectList(new LambdaQueryWrapper<ErrandOrder>()
+                .eq(ErrandOrder::getRunnerId, userId)
+                .eq(ErrandOrder::getStatus, Constants.STATUS_COMPLETED));
+        vo.setIncome(completedOrders.stream()
+                .map(o -> o.getReward() == null ? BigDecimal.ZERO : o.getReward())
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        // 评分
+        User user = userService.getByIdRequired(userId);
+        vo.setRating(user.getRating() == null ? BigDecimal.ZERO : user.getRating());
+        vo.setRatingCount(user.getRatingCount() == null ? 0 : user.getRatingCount());
+        // 我作为发布者的任务情况
+        vo.setPublishedTotal(taskMapper.selectCount(new LambdaQueryWrapper<Task>()
+                .eq(Task::getPublisherId, userId)));
+        vo.setPublishedActive(taskMapper.selectCount(new LambdaQueryWrapper<Task>()
+                .eq(Task::getPublisherId, userId)
+                .in(Task::getStatus, Constants.STATUS_PENDING, Constants.STATUS_ACCEPTED,
+                        Constants.STATUS_IN_PROGRESS, Constants.STATUS_FINISHED)));
+        // 广场概览
+        vo.setPendingCount(taskMapper.selectCount(new LambdaQueryWrapper<Task>()
+                .eq(Task::getStatus, Constants.STATUS_PENDING)));
+        vo.setTodayCompleted(taskMapper.selectCount(new LambdaQueryWrapper<Task>()
+                .eq(Task::getStatus, Constants.STATUS_COMPLETED)
+                .ge(Task::getCompleteTime, todayStart)));
+        return vo;
     }
 
     // ==================== 私有方法 ====================
@@ -321,6 +399,7 @@ public class TaskServiceImpl implements TaskService {
         User runner = userMap.get(task.getRunnerId());
         if (runner != null) {
             vo.setRunnerName(displayName(runner));
+            vo.setRunnerRating(runner.getRating());
         }
         // 当前用户身份
         if (userId != null) {

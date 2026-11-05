@@ -27,7 +27,8 @@ public class OrderController {
     @Operation(summary = "我的接单记录")
     @GetMapping
     public Result<PageResult<OrderVO>> myOrders(@RequestParam(defaultValue = "1") Integer page,
-                                                @RequestParam(defaultValue = "10") Integer size) {
-        return Result.ok(taskService.myAccepted(UserContext.userId(), page, size));
+                                                @RequestParam(defaultValue = "10") Integer size,
+                                                @RequestParam(required = false) String status) {
+        return Result.ok(taskService.myAccepted(UserContext.userId(), page, size, status));
     }
 }

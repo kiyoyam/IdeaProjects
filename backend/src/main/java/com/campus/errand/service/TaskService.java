@@ -4,6 +4,7 @@ import com.campus.errand.common.PageResult;
 import com.campus.errand.dto.TaskPublishDTO;
 import com.campus.errand.dto.TaskQueryDTO;
 import com.campus.errand.vo.OrderVO;
+import com.campus.errand.vo.TaskOverviewVO;
 import com.campus.errand.vo.TaskVO;
 
 /**
@@ -34,5 +35,13 @@ public interface TaskService {
 
     PageResult<TaskVO> myPublished(Long userId, Integer page, Integer size);
 
-    PageResult<OrderVO> myAccepted(Long userId, Integer page, Integer size);
+    /**
+     * 我的接单记录
+     *
+     * @param status ACTIVE(进行中) / COMPLETED / CANCELLED / 具体状态值，为空表示全部
+     */
+    PageResult<OrderVO> myAccepted(Long userId, Integer page, Integer size, String status);
+
+    /** 工作台统计：接单数、收入、评分、广场概览 */
+    TaskOverviewVO overview(Long userId);
 }

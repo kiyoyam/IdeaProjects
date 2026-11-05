@@ -14,6 +14,7 @@ public class OrderVO {
     private Long id;
     private Long taskId;
     private String title;
+    private String category;
     private BigDecimal reward;
     private String status;
     private Long publisherId;

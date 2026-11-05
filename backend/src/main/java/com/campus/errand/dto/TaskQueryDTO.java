@@ -14,4 +14,6 @@ public class TaskQueryDTO {
     private String keyword;
     private String category;
     private String status;
+    /** 排序: latest(最新发布) / reward(报酬最高) / deadline(即将截止) */
+    private String sort;
 }

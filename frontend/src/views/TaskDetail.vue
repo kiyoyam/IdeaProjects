@@ -8,6 +8,17 @@
           <el-tag type="info" effect="plain" style="margin-left: 8px">{{ categoryLabel(task.category) }}</el-tag>
         </div>
       </div>
+      <el-steps v-if="task.status !== 'CANCELLED'" :active="statusStep(task.status)" align-center class="steps">
+        <el-step v-for="s in PROGRESS_STEPS" :key="s" :title="s" />
+      </el-steps>
+      <el-alert
+        v-else
+        :title="`任务已取消${task.cancelReason ? '：' + task.cancelReason : ''}`"
+        type="warning"
+        :closable="false"
+        class="steps"
+      />
+
       <el-descriptions :column="2" border>
         <el-descriptions-item label="报酬">
           <b class="reward">¥{{ task.reward }}</b>
@@ -19,8 +30,12 @@
         <el-descriptions-item label="取件地址">{{ task.pickupAddress }}</el-descriptions-item>
         <el-descriptions-item label="送达地址">{{ task.deliveryAddress }}</el-descriptions-item>
         <el-descriptions-item label="截止时间">{{ task.deadline || '无' }}</el-descriptions-item>
-        <el-descriptions-item label="跑腿员">{{ task.runnerName || '待接单' }}</el-descriptions-item>
+        <el-descriptions-item label="跑腿员">
+          {{ task.runnerName || '待接单' }}
+          <el-rate v-if="task.runnerRating" :model-value="Number(task.runnerRating)" disabled size="small" style="display: inline-block; margin-left: 8px" />
+        </el-descriptions-item>
         <el-descriptions-item label="发布时间">{{ task.createTime }}</el-descriptions-item>
+        <el-descriptions-item label="接单时间">{{ task.acceptTime || '—' }}</el-descriptions-item>
         <el-descriptions-item label="完成时间">{{ task.completeTime || '—' }}</el-descriptions-item>
         <el-descriptions-item v-if="task.cancelReason" label="取消原因" :span="2">{{ task.cancelReason }}</el-descriptions-item>
         <el-descriptions-item label="任务描述" :span="2">{{ task.description || '暂无' }}</el-descriptions-item>
@@ -61,13 +76,14 @@
 
 <script setup>
 import { computed, reactive, ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { taskDetail, acceptTask, startTask, finishTask, confirmTask, cancelTask } from '../api/task'
 import { taskEvaluations, evaluate } from '../api/evaluation'
-import { statusLabel, statusType, categoryLabel } from '../utils/status'
+import { PROGRESS_STEPS, statusStep, statusLabel, statusType, categoryLabel } from '../utils/status'
 
 const route = useRoute()
+const router = useRouter()
 const taskId = route.params.id
 const task = ref(null)
 const evaluations = ref([])
@@ -126,6 +142,20 @@ async function doOp(op) {
   }
   const actions = { accept: acceptTask, start: startTask, finish: finishTask, confirm: confirmTask }
   await actions[op.action](taskId)
+  if (op.action === 'accept') {
+    load()
+    try {
+      await ElMessageBox.confirm('接单成功，是否立即查看你的接单？', '接单成功', {
+        type: 'success',
+        confirmButtonText: '查看我的接单',
+        cancelButtonText: '留在此页'
+      })
+      router.push('/my/accepted')
+    } catch {
+      /* 留在详情页 */
+    }
+    return
+  }
   ElMessage.success('操作成功')
   load()
 }
@@ -165,6 +195,9 @@ onMounted(load)
 .reward {
   color: #f56c6c;
   font-size: 20px;
+}
+.steps {
+  margin-bottom: 18px;
 }
 .ops {
   margin-top: 16px;

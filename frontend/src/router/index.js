@@ -6,8 +6,9 @@ const routes = [
   {
     path: '/',
     component: () => import('../views/Layout.vue'),
-    redirect: '/tasks',
+    redirect: '/workbench',
     children: [
+      { path: 'workbench', component: () => import('../views/Workbench.vue'), meta: { title: '工作台' } },
       { path: 'tasks', component: () => import('../views/TaskList.vue'), meta: { title: '任务广场' } },
       { path: 'publish', component: () => import('../views/TaskPublish.vue'), meta: { title: '发布任务' } },
       { path: 'task/:id', component: () => import('../views/TaskDetail.vue'), meta: { title: '任务详情' } },

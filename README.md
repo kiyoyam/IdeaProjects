@@ -37,9 +37,21 @@ E:\IdeaProjects\campus-errand\
         ├── api\                  # 接口封装
         ├── router\               # 路由与登录守卫
         ├── store\                # Pinia 用户状态
-        ├── utils\status.js       # 状态/分类字典
-        └── views\                # 页面（登录/任务广场/发布/详情/我的发布/我的接单/钱包/管理后台）
+        ├── utils\status.js       # 状态/分类字典、进度节点、倒计时与加急判断
+        └── views\                # 页面（登录/工作台/任务广场/发布/详情/我的发布/我的接单/钱包/管理后台）
 ```
+
+## 二·一、跑腿员工作台（本次新增）
+
+接单之后「活在哪、到哪一步了」是这个平台最关键的信息，因此新增了以跑腿员视角组织的一整套界面：
+
+- **工作台首页**（`/workbench`）：登录后的默认落地页，一屏给出今日接单数、手上待处理单量、累计收入、信用评分，以及「我进行中的接单」进度列表和广场推荐任务；
+- **接单后直达**：任务广场/任务详情接单成功后，会直接提示「查看我的接单」，一键跳到手上的单，不用再自己找入口；
+- **菜单角标**：顶部「我的接单」实时显示进行中数量，每次切换页面自动刷新；
+- **我的接单页**（`/my/accepted`）：按 进行中 / 已完成 / 已取消 / 全部 分组，每单带状态标签、进度条、截止倒计时、发布者与接单时间，可直接开始配送、标记送达、取消接单；
+- **任务广场**（`/tasks`）：支持按最新发布 / 报酬最高 / 即将截止排序，24 小时内截止的任务打「加急」标，分类带图标，并提供「只看待接单」等快捷筛选；
+- **任务详情**（`/task/{id}`）：顶部五段式状态时间线（发布→接单→配送→送达→完成），展示接单时间与双方评分。
+
 
 ## 三、数据库设计
 
@@ -75,16 +87,17 @@ PENDING(待接单) ─接单→ ACCEPTED(已接单) ─开始配送→ IN_PROGRE
 | | GET | /auth/info | 当前用户 |
 | | POST | /auth/recharge | 模拟充值 |
 | 任务 | POST | /tasks | 发布任务 |
-| | GET | /tasks | 任务广场分页（keyword/category/status） |
-| | GET | /tasks/{id} | 任务详情 |
+| | GET | /tasks | 任务广场分页（keyword/category/status/sort，sort 支持 latest·reward·deadline） |
+| | GET | /tasks/overview | 工作台统计（进行中/已完成/收入/评分/广场概览） |
+| | GET | /tasks/{id} | 任务详情（含接单时间、双方评分） |
 | | POST | /tasks/{id}/accept | 接单 |
 | | POST | /tasks/{id}/start | 开始配送 |
 | | POST | /tasks/{id}/finish | 标记送达 |
 | | POST | /tasks/{id}/confirm | 发布者确认完成（结算） |
 | | POST | /tasks/{id}/cancel | 取消任务 |
 | | GET | /tasks/mine/published | 我发布的 |
-| | GET | /tasks/mine/accepted | 我接的 |
-| 接单 | GET | /orders | 我的接单记录 |
+| | GET | /tasks/mine/accepted | 我接的（支持 status=ACTIVE/COMPLETED/CANCELLED） |
+| 接单 | GET | /orders | 我的接单记录（同样支持 status 筛选） |
 | 结算 | GET | /settlements | 我的结算记录 |
 | | GET | /settlements/wallet | 钱包信息（余额/收支统计） |
 | | POST | /settlements/withdrawals | 申请提现 |
@@ -134,7 +147,7 @@ npm run dev
 | stu001 | 123456 | 学生 | 发布任务 |
 | runner001 | 123456 | 跑腿员 | 接单赚钱 |
 
-演示链路：`runner001 登录 → 任务广场接单 → 开始配送 → 标记送达 → stu001 确认完成（结算到账）→ 双方评价`。
+演示链路：`runner001 登录 → 工作台看到手上的单 → 任务广场接单（角标 +1）→ 开始配送 → 标记送达 → stu001 确认完成（结算到账）→ 双方评价`。
 
 ## 七、主要依赖版本
 

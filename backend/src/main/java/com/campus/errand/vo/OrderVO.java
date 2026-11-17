@@ -24,4 +24,6 @@ public class OrderVO {
     private LocalDateTime deadline;
     private LocalDateTime createTime;
     private LocalDateTime completeTime;
+    /** 当前用户是否已对该订单评价（完成后展示「去评价」用） */
+    private Boolean evaluated = false;
 }

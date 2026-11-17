@@ -35,10 +35,11 @@ E:\IdeaProjects\campus-errand\
     ├── vite.config.js            # 开发代理 /api → localhost:8080
     └── src\
         ├── api\                  # 接口封装
+        ├── components\           # 公共组件（RateDialog 评分模板弹窗）
         ├── router\               # 路由与登录守卫
         ├── store\                # Pinia 用户状态
         ├── utils\status.js       # 状态/分类字典、进度节点、倒计时与加急判断
-        └── views\                # 页面（登录/工作台/任务广场/发布/详情/我的发布/我的接单/钱包/管理后台）
+        └── views\                # 页面（登录/工作台/任务广场/发布/详情/我的发布/我的接单/评价中心/钱包/管理后台）
 ```
 
 ## 二·一、跑腿员工作台（本次新增）
@@ -51,6 +52,29 @@ E:\IdeaProjects\campus-errand\
 - **我的接单页**（`/my/accepted`）：按 进行中 / 已完成 / 已取消 / 全部 分组，每单带状态标签、进度条、截止倒计时、发布者与接单时间，可直接开始配送、标记送达、取消接单；
 - **任务广场**（`/tasks`）：支持按最新发布 / 报酬最高 / 即将截止排序，24 小时内截止的任务打「加急」标，分类带图标，并提供「只看待接单」等快捷筛选；
 - **任务详情**（`/task/{id}`）：顶部五段式状态时间线（发布→接单→配送→送达→完成），展示接单时间与双方评分。
+
+## 二·二、评价模块（评分模板）
+
+订单完成后双方互评，评价由「总评分 + 分项评分 + 快捷标签 + 文字 + 匿名」组成：
+
+| 项目 | 说明 |
+| --- | --- |
+| 总评分 | 1-5 星，参与用户信用分计算（`user.rating` / `rating_count`） |
+| 分项评分 | 配送速度 / 服务态度 / 完成质量，各 1-5 星，可不填 |
+| 快捷标签 | 最多 6 个，如「准时送达」「态度好」「沟通顺畅」，用于标签云统计 |
+| 文字评价 | 选填，最多 500 字 |
+| 匿名评价 | 开启后他人只看到「匿名用户」，本人仍可见 |
+
+入口设计（完成后随手就能评，不用找）：
+
+- **评价中心**（`/evaluations`）：顶部是个人评价汇总（平均分、好评率、三维度均分、标签云），下方分「待评价 / 我收到的 / 我发出的」三个标签页；
+- **顶部菜单**：「评价中心」带待评价数量角标，切页自动刷新；
+- **我的接单 / 我的发布**：已完成的订单直接出现「去评价」按钮，评过显示「已评价」；
+- **工作台**：有未评价订单时顶部弹提示条，一键跳转；
+- **任务详情**：评论区展示标签与匿名状态，完成后出现「我要评价」。
+
+> 已有数据库需要执行一次 `backend/sql/upgrade_v2_evaluation.sql`（新增 `speed_rating`、`service_rating`、`quality_rating`、`tags`、`anonymous` 五个字段）；新建库直接用 `campus_errand.sql` 即可。
+
 
 
 ## 三、数据库设计
@@ -102,8 +126,11 @@ PENDING(待接单) ─接单→ ACCEPTED(已接单) ─开始配送→ IN_PROGRE
 | | GET | /settlements/wallet | 钱包信息（余额/收支统计） |
 | | POST | /settlements/withdrawals | 申请提现 |
 | | GET | /settlements/withdrawals | 我的提现记录 |
-| 评价 | POST | /evaluations | 提交评价 |
+| 评价 | POST | /evaluations | 提交评价（总分+三维度+标签+匿名，每人每任务一次） |
 | | GET | /evaluations/task/{taskId} | 任务评价列表 |
+| | GET | /evaluations/pending | 待评价订单 |
+| | GET | /evaluations/received · /sent | 我收到的 / 我发出的评价 |
+| | GET | /evaluations/summary/me · /summary/{userId} | 评价汇总（均分/好评率/标签统计） |
 | 管理 | GET | /admin/users · /admin/tasks · /admin/settlements · /admin/withdrawals | 后台列表 |
 | | POST | /admin/withdrawals/{id}/approve · /reject | 提现审批 |
 
@@ -116,6 +143,8 @@ PENDING(待接单) ─接单→ ACCEPTED(已接单) ─开始配送→ IN_PROGRE
 ```sql
 -- 已内置脚本，或手动执行：
 mysql -uroot -p715620504 < E:\IdeaProjects\campus-errand\backend\sql\campus_errand.sql
+-- 已有的旧库升级（补充评价字段）：
+mysql -uroot -p715620504 campus_errand < E:\IdeaProjects\campus-errand\backend\sql\upgrade_v2_evaluation.sql
 ```
 
 数据库连接配置在 `backend/src/main/resources/application.yml`（用户名 root，密码默认 `715620504`，

@@ -72,6 +72,13 @@
 
           <div class="order-foot">
             <el-button size="small" @click="$router.push(`/task/${o.taskId}`)">查看详情</el-button>
+            <el-button
+              v-if="o.status === 'COMPLETED' && !o.evaluated"
+              size="small"
+              type="warning"
+              @click="openEval(o)"
+            >去评价</el-button>
+            <el-button v-if="o.status === 'COMPLETED' && o.evaluated" size="small" disabled>已评价</el-button>
             <el-button v-if="o.status === 'ACCEPTED'" size="small" type="primary" @click="doStart(o)">开始配送</el-button>
             <el-button v-if="o.status === 'IN_PROGRESS'" size="small" type="success" @click="doFinish(o)">标记送达</el-button>
             <el-button
@@ -95,6 +102,14 @@
         />
       </div>
     </el-card>
+
+    <RateDialog
+      v-model="evalDialog"
+      :task-id="evalTarget.taskId"
+      :target-name="evalTarget.publisherName"
+      role="RUNNER"
+      @success="load"
+    />
   </div>
 </template>
 
@@ -102,6 +117,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { myOrders, startTask, finishTask, cancelTask, taskOverview } from '../api/task'
+import RateDialog from '../components/RateDialog.vue'
 import {
   categoryIcon,
   countdownText,
@@ -117,6 +133,14 @@ const loading = ref(false)
 const tab = ref('ACTIVE')
 const query = reactive({ page: 1, size: 10 })
 const overview = reactive({ activeCount: 0, completedCount: 0, cancelledCount: 0 })
+const evalDialog = ref(false)
+const evalTarget = reactive({ taskId: null, publisherName: '' })
+
+function openEval(o) {
+  evalTarget.taskId = o.taskId
+  evalTarget.publisherName = o.publisherName
+  evalDialog.value = true
+}
 
 const progressColor = [
   { color: '#f0a020', percentage: 30 },

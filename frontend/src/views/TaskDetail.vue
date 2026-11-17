@@ -51,35 +51,35 @@
       <div v-for="e in evaluations" :key="e.id" class="eval-item">
         <span class="name">{{ e.evaluatorName }}</span>
         <el-rate :model-value="e.rating" disabled />
-        <span class="content">{{ e.content }}</span>
+        <div class="eval-body">
+          <div v-if="e.tags && e.tags.length" class="eval-tags">
+            <el-tag v-for="t in e.tags" :key="t" size="small" effect="plain">{{ t }}</el-tag>
+          </div>
+          <span class="content">{{ e.content || '（未填写文字评价）' }}</span>
+        </div>
         <span class="time">{{ e.createTime }}</span>
       </div>
       <el-button v-if="canEvaluate" type="primary" plain style="margin-top: 12px" @click="openEval">我要评价</el-button>
+      <span v-else-if="task.status === 'COMPLETED' && task.myRole !== 'NONE'" class="evaluated-tip">你已完成评价，感谢反馈</span>
     </el-card>
 
-    <el-dialog v-model="dialog" title="评价任务" width="440px">
-      <el-form label-width="70px">
-        <el-form-item label="评分">
-          <el-rate v-model="evalForm.rating" />
-        </el-form-item>
-        <el-form-item label="内容">
-          <el-input v-model="evalForm.content" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="说说对方的服务体验（选填）" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialog = false">取消</el-button>
-        <el-button type="primary" :loading="evalLoading" @click="submitEval">提交评价</el-button>
-      </template>
-    </el-dialog>
+    <RateDialog
+      v-model="dialog"
+      :task-id="taskId"
+      :target-name="evalTargetName"
+      :role="task?.myRole === 'PUBLISHER' ? 'PUBLISHER' : 'RUNNER'"
+      @success="load"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { taskDetail, acceptTask, startTask, finishTask, confirmTask, cancelTask } from '../api/task'
-import { taskEvaluations, evaluate } from '../api/evaluation'
+import { taskEvaluations } from '../api/evaluation'
+import RateDialog from '../components/RateDialog.vue'
 import { PROGRESS_STEPS, statusStep, statusLabel, statusType, categoryLabel } from '../utils/status'
 
 const route = useRoute()
@@ -88,12 +88,16 @@ const taskId = route.params.id
 const task = ref(null)
 const evaluations = ref([])
 const dialog = ref(false)
-const evalLoading = ref(false)
-const evalForm = reactive({ rating: 5, content: '' })
 
 const canEvaluate = computed(() =>
   task.value && task.value.status === 'COMPLETED' && task.value.myRole !== 'NONE' && !task.value.evaluated
 )
+
+/** 评价对象：我是发布者就评跑腿员，反之评发布者 */
+const evalTargetName = computed(() => {
+  if (!task.value) return ''
+  return task.value.myRole === 'PUBLISHER' ? task.value.runnerName : task.value.publisherName
+})
 
 const ops = computed(() => {
   if (!task.value) return []
@@ -162,21 +166,6 @@ async function doOp(op) {
 
 function openEval() {
   dialog.value = true
-  evalForm.rating = 5
-  evalForm.content = ''
-}
-
-async function submitEval() {
-  if (!evalForm.rating) return ElMessage.warning('请选择评分')
-  evalLoading.value = true
-  try {
-    await evaluate({ taskId: Number(taskId), rating: evalForm.rating, content: evalForm.content })
-    ElMessage.success('评价成功')
-    dialog.value = false
-    load()
-  } finally {
-    evalLoading.value = false
-  }
 }
 
 onMounted(load)
@@ -219,6 +208,22 @@ onMounted(load)
   font-weight: 600;
   color: #303133;
   min-width: 80px;
+}
+.eval-body {
+  flex: 1;
+  min-width: 0;
+}
+.eval-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.evaluated-tip {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #909399;
 }
 .eval-item .content {
   flex: 1;

@@ -27,6 +27,16 @@
       </div>
     </el-card>
 
+    <!-- 待评价提醒 -->
+    <el-alert v-if="pendingEval > 0" type="warning" :closable="false" class="eval-alert" show-icon>
+      <template #title>
+        <span class="eval-alert-text">
+          你有 <b>{{ pendingEval }}</b> 个已完成的订单还没有评价
+        </span>
+        <el-button link type="primary" @click="$router.push('/evaluations')">去评价 →</el-button>
+      </template>
+    </el-alert>
+
     <!-- 数据卡片 -->
     <el-row :gutter="16" class="stats">
       <el-col v-for="c in statCards" :key="c.label" :xs="12" :sm="6">
@@ -133,6 +143,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { myOrders, queryTasks, startTask, finishTask, taskOverview } from '../api/task'
+import { pendingEvaluations } from '../api/evaluation'
 import { useUserStore } from '../store/user'
 import {
   categoryIcon,
@@ -150,6 +161,7 @@ const router = useRouter()
 const loading = ref(false)
 const activeOrders = ref([])
 const recommend = ref([])
+const pendingEval = ref(0)
 const overview = reactive({
   activeCount: 0,
   completedCount: 0,
@@ -180,14 +192,16 @@ const statCards = computed(() => [
 async function load() {
   loading.value = true
   try {
-    const [ov, orders, tasks] = await Promise.all([
+    const [ov, orders, tasks, pending] = await Promise.all([
       taskOverview(),
       myOrders({ page: 1, size: 5, status: 'ACTIVE' }),
-      queryTasks({ page: 1, size: 4, status: 'PENDING', sort: 'reward' })
+      queryTasks({ page: 1, size: 4, status: 'PENDING', sort: 'reward' }),
+      pendingEvaluations({ page: 1, size: 1 })
     ])
     Object.assign(overview, ov)
     activeOrders.value = orders.records || []
     recommend.value = tasks.records || []
+    pendingEval.value = pending.total || 0
   } finally {
     loading.value = false
   }
@@ -263,6 +277,13 @@ onMounted(load)
 }
 .stats {
   margin-bottom: 16px;
+}
+.eval-alert {
+  margin-bottom: 16px;
+  align-items: center;
+}
+.eval-alert-text b {
+  color: #e6a23c;
 }
 .stat-card {
   display: flex;

@@ -15,11 +15,18 @@
         <template #default="{ row }">{{ row.runnerName || '待接单' }}</template>
       </el-table-column>
       <el-table-column prop="createTime" label="发布时间" width="170" />
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="300" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="goDetail(row.id)">详情</el-button>
           <el-button v-if="row.status === 'PENDING'" size="small" type="danger" @click="doCancel(row)">取消</el-button>
           <el-button v-if="row.status === 'FINISHED'" size="small" type="success" @click="doConfirm(row)">确认完成</el-button>
+          <el-button
+            v-if="row.status === 'COMPLETED' && !row.evaluated"
+            size="small"
+            type="warning"
+            @click="openEval(row)"
+          >去评价</el-button>
+          <el-button v-if="row.status === 'COMPLETED' && row.evaluated" size="small" disabled>已评价</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -28,6 +35,14 @@
       <el-pagination layout="prev, pager, next, total" :total="total" :page-size="query.size" :current-page="query.page" @current-change="load" />
     </div>
   </el-card>
+
+  <RateDialog
+    v-model="evalDialog"
+    :task-id="evalTarget.id"
+    :target-name="evalTarget.runnerName"
+    role="PUBLISHER"
+    @success="load"
+  />
 </template>
 
 <script setup>
@@ -35,6 +50,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { myPublished, cancelTask, confirmTask } from '../api/task'
+import RateDialog from '../components/RateDialog.vue'
 import { statusLabel, statusType } from '../utils/status'
 
 const router = useRouter()
@@ -42,6 +58,14 @@ const list = ref([])
 const total = ref(0)
 const loading = ref(false)
 const query = reactive({ page: 1, size: 10 })
+const evalDialog = ref(false)
+const evalTarget = reactive({ id: null, runnerName: '' })
+
+function openEval(row) {
+  evalTarget.id = row.id
+  evalTarget.runnerName = row.runnerName
+  evalDialog.value = true
+}
 
 async function load() {
   loading.value = true

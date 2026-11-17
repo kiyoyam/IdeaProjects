@@ -267,6 +267,12 @@ public class TaskServiceImpl implements TaskService {
                 : taskMapper.selectBatchIds(taskIds).stream().collect(Collectors.toMap(Task::getId, Function.identity()));
         Set<Long> publisherIds = orders.stream().map(ErrandOrder::getPublisherId).collect(Collectors.toSet());
         Map<Long, User> userMap = userMap(publisherIds);
+        // 当前用户已评价过的任务，用于列表里的「去评价 / 已评价」
+        Set<Long> evaluatedTaskIds = taskIds.isEmpty() ? Collections.emptySet()
+                : evaluationMapper.selectList(new LambdaQueryWrapper<Evaluation>()
+                        .eq(Evaluation::getEvaluatorId, userId)
+                        .in(Evaluation::getTaskId, taskIds))
+                .stream().map(Evaluation::getTaskId).collect(Collectors.toSet());
         List<OrderVO> vos = new ArrayList<>();
         for (ErrandOrder o : orders) {
             OrderVO vo = new OrderVO();
@@ -279,6 +285,7 @@ public class TaskServiceImpl implements TaskService {
             vo.setPublisherName(publisher == null ? null : displayName(publisher));
             vo.setCreateTime(o.getCreateTime());
             vo.setCompleteTime(o.getCompleteTime());
+            vo.setEvaluated(evaluatedTaskIds.contains(o.getTaskId()));
             Task t = taskMap.get(o.getTaskId());
             if (t != null) {
                 vo.setTitle(t.getTitle());

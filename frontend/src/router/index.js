@@ -14,6 +14,7 @@ const routes = [
       { path: 'task/:id', component: () => import('../views/TaskDetail.vue'), meta: { title: '任务详情' } },
       { path: 'my/published', component: () => import('../views/MyPublished.vue'), meta: { title: '我的发布' } },
       { path: 'my/accepted', component: () => import('../views/MyAccepted.vue'), meta: { title: '我的接单' } },
+      { path: 'evaluations', component: () => import('../views/EvaluationCenter.vue'), meta: { title: '评价中心' } },
       { path: 'wallet', component: () => import('../views/Wallet.vue'), meta: { title: '钱包结算' } },
       { path: 'admin', component: () => import('../views/Admin.vue'), meta: { title: '管理后台', requiresAdmin: true } }
     ]

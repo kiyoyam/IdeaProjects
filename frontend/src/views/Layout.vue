@@ -22,6 +22,16 @@
             type="danger"
           />
         </el-menu-item>
+        <el-menu-item index="/evaluations">
+          评价中心
+          <el-badge
+            v-if="pendingEvalCount > 0"
+            :value="pendingEvalCount"
+            :max="99"
+            class="nav-badge"
+            type="warning"
+          />
+        </el-menu-item>
         <el-menu-item index="/wallet">钱包结算</el-menu-item>
         <el-menu-item v-if="store.isAdmin" index="/admin">管理后台</el-menu-item>
       </el-menu>
@@ -51,10 +61,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../store/user'
 import { taskOverview } from '../api/task'
+import { pendingEvaluations } from '../api/evaluation'
 import { roleLabel } from '../utils/status'
 
 const store = useUserStore()
@@ -62,6 +73,7 @@ const route = useRoute()
 const router = useRouter()
 
 const overview = reactive({ activeCount: 0, pendingCount: 0 })
+const pendingEvalCount = ref(0)
 
 const activeMenu = computed(() => (route.path.startsWith('/task/') ? '/tasks' : route.path))
 
@@ -69,6 +81,12 @@ async function refreshOverview() {
   try {
     const data = await taskOverview()
     Object.assign(overview, data)
+  } catch {
+    /* 角标失败不影响主流程 */
+  }
+  try {
+    const pending = await pendingEvaluations({ page: 1, size: 1 })
+    pendingEvalCount.value = pending.total || 0
   } catch {
     /* 角标失败不影响主流程 */
   }
